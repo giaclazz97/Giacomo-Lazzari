@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Miei Film - Google Cloud</title>
+    <style>
+        :root { --primary: #ffcc00; --bg: #121212; --card: #1e1e1e; --text: #ffffff; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 450px; }
+        
+        h2 { text-align: center; color: var(--primary); margin-bottom: 25px; }
+        
+        /* Form di inserimento */
+        .form-container { background: var(--card); padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 30px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #2b2b2b; color: white; box-sizing: border-box; font-size: 16px; }
+        input:focus { border-color: var(--primary); outline: none; }
+        button { width: 100%; padding: 14px; background: var(--primary); color: #000; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.3s; }
+        button:active { transform: scale(0.98); }
+
+        /* Anteprima Copertina */
+        #preview { text-align: center; margin: 10px 0; display: none; }
+        #pImg { width: 80px; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+        /* Barra di ricerca e lista */
+        .search-bar { background: #1e1e1e; border: 1px solid #444; margin-bottom: 20px; }
+        .movie-card { display: flex; background: var(--card); margin-bottom: 15px; border-radius: 12px; overflow: hidden; border-left: 4px solid var(--primary); animation: slideIn 0.3s ease; }
+        .movie-card img { width: 75px; height: 110px; object-fit: cover; background: #333; }
+        .movie-info { padding: 12px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }
+        .movie-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 4px; }
+        .movie-date { font-size: 0.85rem; color: #888; }
+
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🎬 Il Mio Archivio</h2>
+
+    <div class="form-container">
+        <input type="text" id="title" placeholder="Titolo film (es. Inception)" onblur="fetchPoster()">
+        <input type="hidden" id="posterUrl">
+        
+        <div id="preview">
+            <img id="pImg" src="">
+            <p style="font-size: 0.7rem; color: #888; margin-top: 5px;">Copertina trovata!</p>
+        </div>
+
+        <input type="date" id="watchDate">
+        <button id="addBtn" onclick="sendToGoogle()">Salva su Google Sheets</button>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
+
+    <input type="text" id="filterInput" class="search-bar" placeholder="🔍 Cerca nei film già visti..." onkeyup="filterMovies()">
+    
+    <div id="movieList"></div>
+</div>
+
+<script>
+    // --- CONFIGURAZIONE ---
+    // Incolla qui l'URL della tua "Distribuzione" di Google Apps Script
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/CODICE_LUNGO_E_STRANO/exec";
+    const TMDB_API_KEY = '8d9019da5643679bc47f070e9329000c'; // Chiave per le copertine
+
+    let myMovies = JSON.parse(localStorage.getItem('myMovieArchive')) || [];
+
+    // 1. Cerca copertina automaticamente
+    async function fetchPoster() {
+        const title = document.getElementById('title').value.trim();
+        if (!title) return;
+
+        try {
+            const resp = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}&language=it-IT`);
+            const data = await resp.json();
+            if (data.results && data.results.length > 0) {
+                const path = data.results[0].poster_path;
+                const fullUrl = `https://image.tmdb.org/t/p/w200${path}`;
+                document.getElementById('posterUrl').value = fullUrl;
+                document.getElementById('pImg').src = fullUrl;
+                document.getElementById('preview').style.display = 'block';
+            }
+        } catch (e) { console.error("Errore API TMDB"); }
+    }
+
+    // 2. Invia dati a Google Sheets e salva localmente
+    function sendToGoogle() {
+        const title = document.getElementById('title').value.trim();
+        const poster = document.getElementById('posterUrl').value;
+        const date = document.getElementById('watchDate').value;
+
+        if (!title || !date) { alert("Inserisci titolo e data!"); return; }
+
+        // Controllo duplicati locale
+        if (myMovies.some(m => m.title.toLowerCase() === title.toLowerCase())) {
+            alert("Film già presente in lista!");
+            return;
+        }
+
+        // Creazione oggetto film
+        const movieObj = { title, poster, date };
+
+        // Salvataggio locale per visualizzazione immediata
+        myMovies.push(movieObj);
+        localStorage.setItem('myMovieArchive', JSON.stringify(myMovies));
+
+        // Invio a Google Sheets (tramite apertura finestra/richiesta)
+        if (GOOGLE_SCRIPT_URL !== "IL_TUO_URL_DI_DISTRIBUZIONE_GOOGLE") {
+            const finalUrl = `${GOOGLE_SCRIPT_URL}?title=${encodeURIComponent(title)}&poster=${encodeURIComponent(poster)}&date=${date}`;
+            window.open(finalUrl, '_blank'); 
+        } else {
+            alert("Film salvato sul telefono, ma configura l'URL di Google per il cloud!");
+        }
+
+        // Reset form
+        document.getElementById('title').value = '';
+        document.getElementById('posterUrl').value = '';
+        document.getElementById('preview').style.display = 'none';
+        render();
+    }
+
+    // 3. Visualizza lista e filtra
+    function render(filter = '') {
+        const list = document.getElementById('movieList');
+        list.innerHTML = '';
+        
+        let sorted = [...myMovies].sort((a, b) => new Date(b.date) - new Date(a.date));
+        let filtered = sorted.filter(m => m.title.toLowerCase().includes(filter.toLowerCase()));
+
+        filtered.forEach(m => {
+            list.innerHTML += `
+                <div class="movie-card">
+                    <img src="${m.poster || 'https://via.placeholder.com/75x110?text=No+Img'}" alt="poster">
+                    <div class="movie-info">
+                        <span class="movie-title">${m.title}</span>
+                        <span class="movie-date">Visto il: ${new Date(m.date).toLocaleDateString('it-IT')}</span>
+                    </div>
+                </div>`;
+        });
+    }
+
+    function filterMovies() {
+        render(document.getElementById('filterInput').value);
+    }
+
+    // Carica lista al primo avvio
+    render();
+</script>
+
+</body>
+</html>
