@@ -173,7 +173,25 @@
     }
 
     // Avvio: Carica i dati da Google
-    loadFromGoogle();
+    async function loadFromGoogle() {
+        try {
+            // Aggiungiamo un timestamp per evitare che il browser usi dati vecchi (cache)
+            const response = await fetch(GOOGLE_URL + "?cacheburst=" + new Date().getTime());
+            if (!response.ok) throw new Error('Errore rete');
+            const data = await response.json();
+            
+            if(Array.isArray(data)) {
+                db = data;
+                localStorage.setItem('jack_db', JSON.stringify(db));
+                document.getElementById('loadingStatus').innerText = "✅ Sincronizzato";
+                render();
+            }
+        } catch (e) {
+            document.getElementById('loadingStatus').innerText = "⚠️ Uso memoria locale";
+            console.log("Sincronizzazione fallita, uso dati locali.");
+            render(); // Mostra comunque i film salvati sul telefono
+        }
+    }
 </script>
 
 </body>
